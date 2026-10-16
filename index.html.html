@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Roll à Aura</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Google Font: Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            cyber: {
+              bg: '#080914',
+              card: '#121528',
+              border: '#21284a',
+              accent: '#6366f1',
+              neon: '#00f0ff',
+              gold: '#ffd700',
+              danger: '#ff2a6d'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #080914; }
+    ::-webkit-scrollbar-thumb { background: #21284a; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #6366f1; }
+    #bgCanvas { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; pointer-events: none; }
+  </style>
+</head>
+
+<body class="bg-cyber-bg text-gray-100 font-sans overflow-x-hidden min-h-screen flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
+
+  <canvas id="bgCanvas"></canvas>
+
+  <!-- BANNIERE D'ANNONCE GLOBALE -->
+  <div id="announcementContainer" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-11/12 max-w-xl pointer-events-none transition-all duration-500 opacity-0 -translate-y-8">
+    <div class="bg-red-600/90 border-2 border-yellow-400 backdrop-blur-md text-white p-4 rounded-xl shadow-2xl flex items-center gap-4">
+      <div class="text-3xl"><i class="fa-solid fa-bullhorn text-yellow-300 animate-bounce"></i></div>
+      <div class="flex-1">
+        <h4 class="font-extrabold text-xs uppercase tracking-wider text-yellow-300">ANNONCE OFFICIELLE ADMIN</h4>
+        <p id="announcementMessage" class="text-sm font-bold">Message du serveur...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- SONDAGE / VOTE EN DIRECT -->
+  <div id="pollContainer" class="fixed bottom-4 right-4 z-50 w-80 bg-cyber-card border-2 border-cyan-400/80 rounded-2xl p-4 shadow-2xl hidden">
+    <div class="flex items-center justify-between border-b border-cyber-border pb-2 mb-2">
+      <span class="text-xs font-black text-cyan-300"><i class="fa-solid fa-vote-yea"></i> SONDAGE SERVEUR</span>
+      <button onclick="closePollUI()" class="text-gray-400 hover:text-white text-xs"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p id="pollQuestionText" class="text-xs font-bold text-white mb-3">Question du sondage...</p>
+    <div class="grid grid-cols-2 gap-2">
+      <button onclick="castVote('YES')" class="py-2 bg-green-600 hover:bg-green-500 text-white font-bold text-xs rounded-xl cursor-pointer">OUI (<span id="pollYesCount">0</span>)</button>
+      <button onclick="castVote('NO')" class="py-2 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl cursor-pointer">NON (<span id="pollNoCount">0</span>)</button>
+    </div>
+  </div>
+
+  <!-- ECRAN DE DEMARRAGE (AVEC PSEUDO ADMIN: vyrox ET CODE SECRET 030813) -->
+  <div id="usernameModal" class="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4">
+    <div class="bg-cyber-card border-2 border-indigo-500/50 rounded-2xl w-full max-w-md p-6 text-center space-y-6 shadow-2xl">
+      <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-indigo-600 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+        <i class="fa-solid fa-dice-d20 text-3xl text-white"></i>
+      </div>
+      <div>
+        <h2 class="text-2xl font-black text-white">Roll à Aura</h2>
+        <p class="text-xs text-gray-400 mt-1">Entre ton pseudo unique (ex: <span class="text-cyan-400 font-bold">Théo93</span> ou <span class="text-indigo-400 font-bold">vyrox</span> pour l'admin).</p>
+      </div>
+
+      <div class="space-y-3">
+        <!-- CHAMP PSEUDO -->
+        <input type="text" id="startUsernameInput" placeholder="Ex: Théo93..." maxlength="16" class="w-full bg-cyber-bg border border-cyber-border rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 text-center font-bold">
+        
+        <!-- CHAMP CODE PIN ADMIN -->
+        <div id="adminPinContainer" class="hidden space-y-2 pt-2 border-t border-cyber-border">
+          <label class="text-xs font-bold text-red-400 block"><i class="fa-solid fa-lock"></i> SÉCURITÉ ADMIN : Entrez le code secret</label>
+          <input type="password" id="adminPinInput" placeholder="Code secret..." maxlength="6" class="w-full bg-cyber-bg border border-red-500/50 rounded-xl px-4 py-3 text-sm text-red-400 focus:outline-none focus:border-red-500 text-center font-extrabold tracking-widest">
+        </div>
+
+        <button onclick="submitInitialUsername()" class="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black rounded-xl shadow-lg transition cursor-pointer">
+          COMMENCER À JOUER
+        </button>
+      </div>
+
+      <p id="usernameErrorMsg" class="text-xs text-red-400 font-semibold hidden"></p>
+    </div>
+  </div>
+
+  <!-- CINEMATIQUE SPECIALE POUR LES AURAS ULTRA RARES -->
+  <div id="cutsceneOverlay" class="fixed inset-0 z-50 bg-black/95 hidden flex-col items-center justify-center p-4 backdrop-blur-xl">
+    <div class="text-center space-y-6 max-w-xl animate-pulse">
+      <div class="text-yellow-400 font-black tracking-widest text-xl uppercase">✦ CINÉMATIQUE COSMIQUE : DROP ULTRA RARE ✦</div>
+      <div id="cutsceneAuraIcon" class="text-9xl my-4 animate-bounce">✨</div>
+      <div id="cutsceneAuraName" class="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-500 to-purple-500">LÉGENDAIRE</div>
+      <div id="cutsceneRarity" class="text-xl font-bold text-gray-300">Rareté: <span class="text-yellow-400">1 / 1M</span></div>
+      <p id="cutsceneFlavor" class="text-xs text-gray-400 italic">"L'univers tout entier plie genou face à cette puissance !"</p>
+      <button onclick="closeCutscene()" class="mt-8 px-8 py-3.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold rounded-xl shadow-lg cursor-pointer">CONTINUER</button>
+    </div>
+  </div>
+
+  <!-- HEADER -->
+  <header class="relative z-10 border-b border-cyber-border bg-cyber-card/80 backdrop-blur-md sticky top-0">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-400 flex items-center justify-center shadow-lg">
+          <i class="fa-solid fa-dice-d20 text-xl text-white"></i>
+        </div>
+        <div>
+          <h1 class="font-black text-lg md:text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-cyan-300 to-white">
+            Roll à Aura <span class="text-xs px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border">50 AURAS</span>
+          </h1>
+          <div class="flex items-center gap-2">
+            <span id="playerUsernameDisplay" class="text-xs font-semibold text-cyan-300"><i class="fa-solid fa-user"></i> Joueur</span>
+            <span id="onlineStatusBadge" class="text-[10px] px-1.5 py-0.2 rounded bg-green-500/20 text-green-300 border border-green-500/30">● En Ligne</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="hidden md:flex items-center gap-6 bg-cyber-bg/60 border border-cyber-border px-4 py-1.5 rounded-xl text-xs">
+        <div><span class="text-gray-400 uppercase text-[9px] block">Pièces</span><span id="headerCoins" class="font-bold text-yellow-300">0</span></div>
+        <div class="h-4 w-px bg-cyber-border"></div>
+        <div><span class="text-gray-400 uppercase text-[9px] block">Gemmes</span><span id="headerGems" class="font-bold text-cyan-300">0</span></div>
+        <div class="h-4 w-px bg-cyber-border"></div>
+        <div><span class="text-gray-400 uppercase text-[9px] block">Tirages</span><span id="headerRolls" class="font-bold text-indigo-300">0</span></div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="adminBtnNav" onclick="openAdminModal()" class="hidden px-3 py-1.5 bg-red-600/20 border border-red-500/50 hover:bg-red-600/40 text-red-300 text-xs font-bold rounded-lg items-center gap-1.5 transition cursor-pointer">
+          <i class="fa-solid fa-user-shield"></i> PANEL ADMIN OP
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="relative z-10 max-w-7xl mx-auto px-4 py-6 flex-1 w-full flex flex-col gap-6">
+
+    <div class="flex overflow-x-auto gap-2 pb-2 border-b border-cyber-border no-scrollbar">
+      <button onclick="switchTab('roll')" id="tabBtn-roll" class="tab-btn px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition bg-indigo-600 text-white shadow-lg whitespace-nowrap cursor-pointer"><i class="fa-solid fa-dice"></i> Tirage</button>
+      <button onclick="switchTab('shop')" id="tabBtn-shop" class="tab-btn px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition bg-cyber-card text-gray-400 hover:text-white whitespace-nowrap cursor-pointer"><i class="fa-solid fa-store text-yellow-400"></i> Boutique</button>
+      <button onclick="switchTab('equipped')" id="tabBtn-equipped" class="tab-btn px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition bg-cyber-card text-gray-400 hover:text-white whitespace-nowrap cursor-pointer"><i class="fa-solid fa-shield-halved"></i> Équipement</button>
+      <button onclick="switchTab('inventory')" id="tabBtn-inventory" class="tab-btn px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition bg-cyber-card text-gray-400 hover:text-white whitespace-nowrap cursor-pointer"><i class="fa-solid fa-box-open"></i> Inventaire</button>
+      <button onclick="switchTab('index')" id="tabBtn-index" class="tab-btn px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition bg-cyber-card text-gray-400 hover:text-white whitespace-nowrap cursor-pointer"><i class="fa-solid fa-book-open text-cyan-400"></i> Index (50 Auras)</button>
+      <button onclick="switchTab('leaderboard')" id="tabBtn-leaderboard" class="tab-btn px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition bg-cyber-card text-gray-400 hover:text-white whitespace-nowrap cursor-pointer"><i class="fa-solid fa-globe"></i> Classement</button>
+      <button onclick="switchTab('arena')" id="tabBtn-arena" class="tab-btn px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition bg-cyber-card text-gray-400 hover:text-white whitespace-nowrap cursor-pointer"><i class="fa-solid fa-swords"></i> Arène</button>
+    </div>
+
+    <!-- TAB 1: ROLL -->
+    <section id="tab-roll" class="tab-content flex flex-col items-center justify-center gap-8 py-8">
+      <div class="w-full max-w-lg bg-cyber-card/80 border border-cyber-border rounded-2xl p-6 text-center shadow-2xl relative overflow-hidden">
+        <div class="text-xs uppercase font-bold text-gray-400 mb-2">Résultat du Dernier Tirage</div>
+        <div class="py-4" id="rollDisplayBox">
+          <div id="mainAuraIcon" class="text-7xl mb-3 transition-transform">🎲</div>
+          <h2 id="mainAuraName" class="text-3xl font-black text-gray-400">Prêt à lancer</h2>
+          <div id="mainAuraRarity" class="text-sm font-bold text-gray-400 mt-1">Clique ci-dessous pour tenter ta chance !</div>
+        </div>
+      </div>
+
+      <div class="flex flex-col items-center gap-4 w-full max-w-sm">
+        <button id="rollButton" onclick="triggerRoll()" class="w-full py-5 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white font-black text-xl tracking-wider rounded-2xl shadow-xl border border-white/20 active:scale-95 transition cursor-pointer">
+          <i class="fa-solid fa-dice-d20"></i> TOURNER (ROLL)
+        </button>
+        <div class="flex items-center justify-between w-full bg-cyber-card border border-cyber-border px-4 py-2.5 rounded-xl text-xs font-semibold">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="autoRollToggle" onchange="toggleAutoRoll()" class="w-4 h-4 rounded bg-cyber-bg border-cyber-border text-indigo-600">
+            <span>Auto-Roll Continu</span>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: SHOP -->
+    <section id="tab-shop" class="tab-content hidden flex-col gap-6">
+      <div class="bg-cyber-card border border-cyber-border rounded-2xl p-6 shadow-xl">
+        <h2 class="text-xl font-black text-white mb-4">Boutique d'Améliorations</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="bg-cyber-bg border border-cyber-border rounded-xl p-4 flex flex-col justify-between gap-3">
+            <div>
+              <h3 class="font-bold text-sm text-white">Multiplicateur de Luck (+15% / Niv)</h3>
+              <div class="mt-2 text-xs font-bold text-green-400">Niveau: <span id="shopLuckLevel">0</span></div>
+            </div>
+            <button onclick="buyShopUpgrade('luck')" class="w-full py-2 bg-green-600 hover:bg-green-500 text-white font-bold rounded-lg text-xs cursor-pointer">Améliorer (<span id="costShopLuck">100</span> Pièces)</button>
+          </div>
+          <div class="bg-cyber-bg border border-cyber-border rounded-xl p-4 flex flex-col justify-between gap-3">
+            <div>
+              <h3 class="font-bold text-sm text-white">Multiplicateur de Cash (+25% / Niv)</h3>
+              <div class="mt-2 text-xs font-bold text-yellow-300">Niveau: <span id="shopCashLevel">0</span></div>
+            </div>
+            <button onclick="buyShopUpgrade('cash')" class="w-full py-2 bg-yellow-600 hover:bg-yellow-500 text-white font-bold rounded-lg text-xs cursor-pointer">Améliorer (<span id="costShopCash">250</span> Pièces)</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: EQUIPPED -->
+    <section id="tab-equipped" class="tab-content hidden flex-col gap-6">
+      <div class="bg-cyber-card border border-cyber-border rounded-2xl p-6">
+        <h2 class="text-xl font-black text-white mb-4">Auras Équipées (Multi-Slots)</h2>
+        <p class="text-xs text-gray-400 mb-4">Gère ici les auras qui renforcent ton Luck, ton Cash/s et ton DPS en combat.</p>
+        <div id="equippedSlotsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"></div>
+      </div>
+    </section>
+
+    <!-- TAB 4: INVENTORY -->
+    <section id="tab-inventory" class="tab-content hidden flex-col gap-4">
+      <div class="bg-cyber-card border border-cyber-border rounded-xl p-4 flex flex-col md:flex-row justify-between items-center gap-3">
+        <span class="text-xs text-gray-400">Inventaire complet de vos auras collectées</span>
+        <div class="flex gap-2">
+          <button onclick="equipBestAuras()" class="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl text-xs font-bold shadow-lg cursor-pointer flex items-center gap-2">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> Équiper Meilleures Auras
+          </button>
+          <button onclick="autoSellDuplicates()" class="px-3 py-2 bg-yellow-600/20 border border-yellow-500/40 text-yellow-300 text-xs font-bold rounded-lg cursor-pointer">Vendre Doublons Communs</button>
+        </div>
+      </div>
+      <div id="inventoryGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3"></div>
+    </section>
+
+    <!-- TAB 5: INDEX -->
+    <section id="tab-index" class="tab-content hidden flex-col gap-6">
+      <div class="bg-cyber-card border border-cyber-border rounded-2xl p-6 shadow-xl space-y-4">
+        <div class="flex justify-between items-center border-b border-cyber-border pb-4">
+          <h2 class="text-xl font-black text-white flex items-center gap-2"><i class="fa-solid fa-book-open text-cyan-400"></i> Index Mondial des 50 Auras</h2>
+          <span id="indexCounter" class="text-xs font-bold text-cyan-300 bg-cyan-950/60 border border-cyan-500/30 px-3 py-1 rounded-lg">Découvertes : 0 / 50</span>
+        </div>
+        <div id="indexGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[60vh] overflow-y-auto pr-2"></div>
+      </div>
+    </section>
+
+    <!-- TAB 6: LEADERBOARD -->
+    <section id="tab-leaderboard" class="tab-content hidden flex-col gap-6">
+      <div class="bg-cyber-card border border-cyber-border rounded-2xl p-6 shadow-xl space-y-4">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <h2 class="text-xl font-black text-white flex items-center gap-2"><i class="fa-solid fa-globe text-cyan-400"></i> Classements en Ligne</h2>
+          <div class="flex flex-wrap gap-2">
+            <button onclick="switchLeaderboardCategory('rarity')" id="lbBtn-rarity" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold transition cursor-pointer">🌟 Aura la plus rare</button>
+            <button onclick="switchLeaderboardCategory('cash')" id="lbBtn-cash" class="px-3 py-1.5 bg-cyber-bg border border-cyber-border text-gray-400 hover:text-white rounded-lg text-xs font-bold transition cursor-pointer">💵 Argent par sec</button>
+            <button onclick="switchLeaderboardCategory('time')" id="lbBtn-time" class="px-3 py-1.5 bg-cyber-bg border border-cyber-border text-gray-400 hover:text-white rounded-lg text-xs font-bold transition cursor-pointer">⏳ Temps joué</button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-cyber-bg/80 text-xs uppercase text-gray-400 border-b border-cyber-border">
+              <tr>
+                <th class="py-3 px-4">Rang</th>
+                <th class="py-3 px-4">Joueur</th>
+                <th id="lbValueHeader" class="py-3 px-4">Valeur</th>
+                <th class="py-3 px-4 text-right">Statut</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboardRows" class="divide-y divide-cyber-border/50"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 7: ARENA -->
+    <section id="tab-arena" class="tab-content hidden flex-col gap-6">
+      <div class="bg-cyber-card border border-cyber-border rounded-2xl p-6 text-center max-w-2xl mx-auto w-full">
+        <h2 class="text-2xl font-black text-red-400 mb-1">ARÈNE DU BOSS COSMIQUE</h2>
+        <p class="text-xs text-gray-400 mb-4">Le DPS cumulé de vos auras blesse le boss en temps réel.</p>
+        <div class="text-sm font-bold mb-2"><span id="bossHealthText">1000 / 1000 PV</span></div>
+        <button onclick="attackBoss()" class="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-black rounded-xl text-lg shadow-lg cursor-pointer">ATTAQUER LE BOSS</button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- PANEL ADMIN 100x PLUS OP (EXCLUSIF vyrox AVEC CODE 030813) -->
+  <div id="adminModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-cyber-card border-2 border-red-500/80 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+      <div class="bg-red-950/90 border-b border-red-500/50 p-4 flex items-center justify-between">
+        <div class="flex items-center gap-2 text-red-400 font-black text-lg">
+          <i class="fa-solid fa-user-shield text-xl animate-pulse"></i>
+          <span>PANEL ADMIN SUPRÊME 100x OP (vyrox)</span>
+        </div>
+        <button onclick="closeAdminModal()" class="text-gray-400 hover:text-white text-lg px-2 cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="p-6 overflow-y-auto space-y-6 flex-1">
+        <!-- 1. ANNONCE MONDIALE EN DIRECT -->
+        <div class="bg-cyber-bg border border-yellow-500/40 p-4 rounded-xl space-y-3 shadow-lg">
+          <h4 class="font-bold text-xs uppercase text-yellow-400 flex items-center gap-2"><i class="fa-solid fa-bullhorn"></i> Annonce Mondiale en Direct</h4>
+          <div class="flex gap-2">
+            <input type="text" id="adminAnnounceMsg" placeholder="Écris ton message d'annonce ici..." class="flex-1 bg-cyber-card border border-cyber-border rounded-lg px-3 py-2 text-xs text-white">
+            <button onclick="adminSendAnnouncement()" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white font-bold text-xs rounded-lg cursor-pointer">Envoyer</button>
+          </div>
+        </div>
+
+        <!-- 2. LES 5 ÉVÉNEMENTS SERVEUR OP -->
+        <div class="bg-cyber-bg border border-purple-500/40 p-4 rounded-xl space-y-3 shadow-lg">
+          <h4 class="font-bold text-xs uppercase text-purple-400 flex items-center gap-2"><i class="fa-solid fa-bolt"></i> DÉCLENCHER LES 5 ÉVÉNEMENTS SERVEUR</h4>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <button onclick="adminTriggerEvent('LUCK_X10')" class="py-2.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-lg cursor-pointer">1. Super Luck x10</button>
+            <button onclick="adminTriggerEvent('CASH_X5')" class="py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg cursor-pointer">2. Super Cash x5</button>
+            <button onclick="adminTriggerEvent('INSTANT_ROLL')" class="py-2.5 bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold rounded-lg cursor-pointer">3. Instant Roll 0.1s</button>
+            <button onclick="adminTriggerEvent('MEGA_BOSS')" class="py-2.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-lg cursor-pointer">4. Mega Boss Event</button>
+            <button onclick="adminTriggerEvent('ULTRA_DROP')" class="py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-lg cursor-pointer">5. Ultra Drop Boost</button>
+          </div>
+        </div>
+
+        <!-- 3. CRÉER UN SONDAGE / VOTE -->
+        <div class="bg-cyber-bg border border-cyan-500/40 p-4 rounded-xl space-y-3 shadow-lg">
+          <h4 class="font-bold text-xs uppercase text-cyan-400 flex items-center gap-2"><i class="fa-solid fa-vote-yea"></i> Créer un Sondage / Vote Serveur</h4>
+          <div class="flex gap-2">
+            <input type="text" id="adminPollQuestion" placeholder="Ex: Voulez-vous un événement d'1 heure ?" class="flex-1 bg-cyber-card border border-cyber-border rounded-lg px-3 py-2 text-xs text-white">
+            <button onclick="adminCreatePoll()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-lg cursor-pointer">Lancer Vote</button>
+          </div>
+        </div>
+
+        <!-- 4. BAN / MODÉRATION EN DIRECT -->
+        <div class="bg-cyber-bg border border-red-500/40 p-4 rounded-xl space-y-3 shadow-lg">
+          <h4 class="font-bold text-xs uppercase text-red-400 flex items-center gap-2"><i class="fa-solid fa-ban"></i> Modération & Bannissement</h4>
+          <div class="flex gap-2">
+            <input type="text" id="adminBanUsername" placeholder="Pseudo du joueur à bannir..." class="flex-1 bg-cyber-card border border-cyber-border rounded-lg px-3 py-2 text-xs text-white">
+            <button onclick="adminBanPlayer()" class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-lg cursor-pointer">Bannir</button>
+            <button onclick="adminUnbanPlayer()" class="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white font-bold text-xs rounded-lg cursor-pointer">Débannir</button>
+          </div>
+        </div>
+
+        <!-- 5. INJECTION DE MONNAIE & BOOSTS OP -->
+        <div class="bg-cyber-bg border border-green-500/40 p-4 rounded-xl space-y-3 shadow-lg">
+          <h4 class="font-bold text-xs uppercase text-green-400 flex items-center gap-2"><i class="fa-solid fa-coins"></i> Injection Ultime de Monnaie & Auras</h4>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <button onclick="adminGiveCoins()" class="py-2.5 bg-yellow-600 hover:bg-yellow-500 text-white text-xs font-bold rounded-lg cursor-pointer">+100M Pièces</button>
+            <button onclick="adminGiveGems()" class="py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-lg cursor-pointer">+100k Gemmes</button>
+            <button onclick="adminMaxUpgrades()" class="py-2.5 bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold rounded-lg cursor-pointer">Maxer Boutiques</button>
+            <button onclick="adminUnlockAllAuras()" class="py-2.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-lg cursor-pointer">Débloquer All 50 Auras</button>
+            <button onclick="resetGameData()" class="py-2.5 bg-red-900 hover:bg-red-800 text-white text-xs font-bold rounded-lg cursor-pointer">Réinitialiser Ma Sauvegarde</button>
+          </div>
+        </div>
+
+        <!-- 6. INJECTEUR D'AURA -->
+        <div class="bg-cyber-bg border border-indigo-500/40 p-4 rounded-xl space-y-3 shadow-lg">
+          <h4 class="font-bold text-xs uppercase text-indigo-400 flex items-center gap-2"><i class="fa-solid fa-wand-magic-sparkles"></i> Injecter une Aura Précise</h4>
+          <div class="flex gap-3">
+            <select id="adminAuraSelect" class="flex-1 bg-cyber-card border border-cyber-border rounded-lg px-3 py-2 text-xs text-gray-200"></select>
+            <button onclick="adminInjectAura()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-lg cursor-pointer">Injecter</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FIREBASE MULTIJOUEUR AVEC BANS, POLLS & EVENTS -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'roll-a-aura-v70';
+    const firebaseConfig = typeof __firebase_config !== 'undefined' 
+      ? JSON.parse(__firebase_config) 
+      : { apiKey: "dummy", authDomain: "dummy.firebaseapp.com", projectId: "dummy-project" };
+
+    let db = null;
+    let auth = null;
+    let userId = null;
+
+    try {
+      const app = initializeApp(firebaseConfig);
+      db = getFirestore(app);
+      auth = getAuth(app);
+
+      async function initAuth() {
+        try {
+          await signInAnonymously(auth);
+          userId = auth.currentUser?.uid || crypto.randomUUID();
+        } catch(err) {
+          userId = crypto.randomUUID();
+        }
+        window.ONLINE_USER_ID = userId;
+        const statusBadge = document.getElementById('onlineStatusBadge');
+        if(statusBadge) statusBadge.innerHTML = '● En Ligne';
+        setupFirestoreListener();
+      }
+      initAuth();
+    } catch (e) {
+      const statusBadge = document.getElementById('onlineStatusBadge');
+      if(statusBadge) statusBadge.innerHTML = '● Hors Ligne';
+    }
+
+    window.registerOrVerifyUsername = async function(chosenName) {
+      const cleanName = chosenName.trim();
+      if (!db || !auth || !auth.currentUser) return { success: true, name: cleanName };
+      
+      const lowerKey = cleanName.toLowerCase().replace(/[^a-z0-9._]/g, '');
+
+      if (cleanName.length < 3 || cleanName.length > 16) {
+        return { success: false, msg: "Le pseudo doit faire entre 3 et 16 caractères." };
+      }
+
+      try {
+        const usernameRef = doc(db, 'artifacts', appId, 'public', 'data', 'usernames', lowerKey);
+        let isTaken = false;
+
+        await runTransaction(db, async (transaction) => {
+          const nameDoc = await transaction.get(usernameRef);
+          if (nameDoc.exists() && nameDoc.data().ownerUid !== auth.currentUser.uid) {
+            isTaken = true;
+            return;
+          }
+          transaction.set(usernameRef, { ownerUid: auth.currentUser.uid, originalName: cleanName });
+        });
+
+        if (isTaken) {
+          return { success: false, msg: "Ce pseudo est déjà pris par un autre joueur !" };
+        }
+        return { success: true, name: cleanName };
+      } catch (err) {
+        return { success: true, name: cleanName };
+      }
+    };
+
+    window.syncOnlineLeaderboardState = async function(player) {
+      if (!db || !auth || !auth.currentUser) return;
+      try {
+        const userDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'leaderboard', auth.currentUser.uid);
+        
+        let bestRarity = 2;
+        let bestAuraName = "Commun";
+        let bestAuraIcon = "⚪";
+
+        if(window.AURAS_DATABASE) {
+          window.AURAS_DATABASE.forEach(aura => {
+            if ((player.inventory[aura.id] || 0) > 0 && aura.chance >= bestRarity) {
+              bestRarity = aura.chance;
+              bestAuraName = aura.name;
+              bestAuraIcon = aura.icon;
+            }
+          });
+        }
+
+        await setDoc(userDocRef, {
+          username: player.username || 'Joueur',
+          rolls: player.totalRolls || 0,
+          coins: player.coins || 0,
+          cashPerSec: window.calculateTotalEquippedCash ? window.calculateTotalEquippedCash() : 0,
+          timePlayed: player.timePlayed || 0,
+          bestRarity: bestRarity,
+          bestAuraName: bestAuraName,
+          bestAuraIcon: bestAuraIcon,
+          updatedAt: Date.now()
+        }, { merge: true });
+      } catch (err) {}
+    };
+
+    function setupFirestoreListener() {
+      if (!db) return;
+      try {
+        const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'leaderboard');
+        onSnapshot(colRef, (snapshot) => {
+          const onlinePlayers = [];
+          snapshot.forEach(docSnap => {
+            onlinePlayers.push({ id: docSnap.id, ...docSnap.data() });
+          });
+          window.ONLINE_LEADERBOARD_DATA = onlinePlayers;
+          if (typeof window.renderLeaderboard === 'function') window.renderLeaderboard();
+        });
+
+        const globalRef = doc(db, 'artifacts', appId, 'public', 'data', 'serverState');
+        onSnapshot(globalRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.announcement) window.showGlobalBanner(data.announcement);
+            if (data.activeEvent) window.applyAdminEvent(data.activeEvent);
+            if (data.activePoll) window.updatePollUI(data.activePoll);
+            if (data.bannedUsers && data.bannedUsers.includes(window.player.username.toLowerCase())) {
+              alert("Votre compte a été banni par l'administrateur.");
+              location.reload();
+            }
+          }
+        });
+      } catch(e) {}
+    }
+
+    window.firebaseAdminAction = async function(actionType, payload) {
+      if (!db || !window.player.isAdmin) return;
+      try {
+        const globalRef = doc(db, 'artifacts', appId, 'public', 'data', 'serverState');
+        if (actionType === 'announcement') {
+          await setDoc(globalRef, { announcement: payload, updatedAt: Date.now() }, { merge: true });
+        } else if (actionType === 'event') {
+          await setDoc(globalRef, { activeEvent: payload, updatedAt: Date.now() }, { merge: true });
+        } else if (actionType === 'poll') {
+          await setDoc(globalRef, { activePoll: { question: payload, yes: 0, no: 0 }, updatedAt: Date.now() }, { merge: true });
+        } else if (actionType === 'ban') {
+          const docSnap = await getDoc(globalRef);
+          let currentBans = docSnap.exists() && docSnap.data().bannedUsers ? docSnap.data().bannedUsers : [];
+          if (!currentBans.includes(payload.toLowerCase())) currentBans.push(payload.toLowerCase());
+          await setDoc(globalRef, { bannedUsers: currentBans }, { merge: true });
+        } else if (actionType === 'unban') {
+          const docSnap = await getDoc(globalRef);
+          let currentBans = docSnap.exists() && docSnap.data().bannedUsers ? docSnap.data().bannedUsers : [];
+          currentBans = currentBans.filter(u => u !== payload.toLowerCase());
+          await setDoc(globalRef, { bannedUsers: currentBans }, { merge: true });
+        }
+      } catch (e) {}
+    };
+
+    window.submitVoteFirebase = async function(type) {
+      if (!db) return;
+      try {
+        const globalRef = doc(db, 'artifacts', appId, 'public', 'data', 'serverState');
+        await runTransaction(db, async (transaction) => {
+          const sfDoc = await transaction.get(globalRef);
+          if (!sfDoc.exists() || !sfDoc.data().activePoll) return;
+          const poll = sfDoc.data().activePoll;
+          if (type === 'YES') poll.yes = (poll.yes || 0) + 1;
+          if (type === 'NO') poll.no = (poll.no || 0) + 1;
+          transaction.set(globalRef, { activePoll: poll }, { merge: true });
+        });
+      } catch(e) {}
+    };
+  </script>
+
+  <!-- MOTEUR DE JEU LOCAL ET BINDINGS ADMIN -->
+  <script>
+    function formatRarity(num) {
+      if (!num || isNaN(num)) return "0";
+      if (num < 1000) return num.toString();
+      const units = ["", "K", "M", "B", "T", "Qa", "Qi"];
+      const i = Math.floor(Math.log10(num) / 3);
+      if (i >= units.length) return num.toExponential(2);
+      const formatted = (num / Math.pow(10, i * 3)).toFixed(1).replace(/\.0$/, '');
+      return formatted + units[i];
+    }
+    window.formatRarity = formatRarity;
+
+    const AURA_CUSTOM_NAMES = [
+      "Commun", "Peu Commun", "Rare", "Épique", "Légendaire",
+      "Givre Éternel", "Enfer Incandescent", "Mythique", "Fantôme Crapuleux", "Céleste",
+      "Tempête Électrique", "Galactique", "Ténèbres Abyssales", "Divin", "Supernova Solaire",
+      "Infini", "Seigneur du Temps", "Singularité Quantique", "Néant Absolu", "Souverain Draconique",
+      "Prisme Stellaire", "Éther Solaire", "Titan Cosmique", "Nova Dimensionnelle", "Apex Céleste",
+      "Abysse Temporel", "Plasma Solaire", "Singularité Divine", "Noyau d'Antimatière", "Horizon des Événements",
+      "Vortex Temporel", "Omni-Présence", "Éclipse Solaire", "Hyperespace", "Transcendance Pure",
+      "Zénith Absolu", "Architecte des Mondes", "Divinité Suprême", "Omnipotent", "Éternité Vivante",
+      "Genesis Stellaire", "Nirvana Cosmique", "Infini Primordial", "Singularité Ultime", "Dieu de l'Aura",
+      "Maître du Chaos", "Souverain du Vide", "Seigneur des Étoiles", "Alpha et Oméga", "L'Absolu Transcendant"
+    ];
+
+    const AURAS_DATABASE = Array.from({length: 50}, (_, i) => {
+      const id = i === 0 ? 'common' : i === 1 ? 'uncommon' : i === 2 ? 'rare' : i === 3 ? 'epic' : i === 4 ? 'legendary' : `aura_${i+1}`;
+      const name = AURA_CUSTOM_NAMES[i] || `Transcendant N°${i+1}`;
+      const chance = i === 0 ? 2 : i === 1 ? 5 : i === 2 ? 20 : i === 3 ? 100 : i === 4 ? 500 : Math.floor(1200 * Math.pow(2.1, i));
+      const icons = ['⚪','🟢','🔵','🟣','🟡','❄️','🔥','🔴','👻','✨','⚡','🌌','🌊','👑','☀️','♾️','⏳','⚛️','🕳️','🐉','🌟','💫','💠','💎','🌀','🔮','⚡','☄️','🛡️','🗡️','🌠','🪐','🌌','🔱','⚜️','🔱','⚡','✨','🔥','🌟','👑','💎','🔮','🌌','⚡','💫','🌀','⭐','🌟','🛐'];
+      const colors = ['#9ca3af','#22c55e','#3b82f6','#a855f7','#eab308','#38bdf8','#f97316','#ef4444','#cbd5e1','#00f0ff','#facc15','#6366f1','#0284c7','#ffd700','#fb923c','#ff2a6d','#a855f7','#22d3ee','#475569','#dc2626'];
+      
+      return {
+        id: id,
+        name: name,
+        chance: chance,
+        icon: icons[i % icons.length],
+        color: colors[i % colors.length],
+        luckBonus: Math.floor(10 * Math.pow(1.58, i)),
+        cashPerSec: Math.floor(2 * Math.pow(1.65, i)),
+        dps: Math.floor(5 * Math.pow(1.6, i)),
+        flavor: 'Aura cosmique dotée d\'une puissance légendaire.'
+      };
+    });
+
+    window.AURAS_DATABASE = AURAS_DATABASE;
+
+    window.player = {
+      username: '',
+      isAdmin: false,
+      coins: 500,
+      gems: 50,
+      totalRolls: 0,
+      timePlayed: 0,
+      equippedAuras: ['common'],
+      maxEquipSlots: 3,
+      inventory: { 'common': 1 },
+      baseLuckMultiplier: 1.0,
+      upgrades: { luckLevel: 0, cashLevel: 0 }
+    };
+
+    window.ONLINE_LEADERBOARD_DATA = [];
+    let currentLbCategory = 'rarity';
+    let isRolling = false;
+    let activeEventMultiplier = 1;
+    let rollSpeedMs = 700;
+
+    // PSEUDO ADMIN EXACT : vyrox
+    document.addEventListener('DOMContentLoaded', () => {
+      const usernameInput = document.getElementById('startUsernameInput');
+      const pinContainer = document.getElementById('adminPinContainer');
+
+      if (usernameInput && pinContainer) {
+        usernameInput.addEventListener('input', (e) => {
+          if (e.target.value.trim().toLowerCase() === "vyrox") {
+            pinContainer.classList.remove('hidden');
+          } else {
+            pinContainer.classList.add('hidden');
+          }
+        });
+      }
+    });
+
+    function calculateTotalEquippedLuck() {
+      let luckBonus = 0;
+      window.player.equippedAuras.forEach(id => {
+        const a = AURAS_DATABASE.find(item => item.id === id);
+        if (a) luckBonus += (a.luckBonus || 0);
+      });
+      return window.player.baseLuckMultiplier * (1 + luckBonus / 100) * (1 + (window.player.upgrades.luckLevel * 0.15)) * activeEventMultiplier;
+    }
+    window.calculateTotalEquippedLuck = calculateTotalEquippedLuck;
+
+    function calculateTotalEquippedCash() {
+      let cash = 0;
+      window.player.equippedAuras.forEach(id => {
+        const a = AURAS_DATABASE.find(item => item.id === id);
+        if (a) cash += (a.cashPerSec || 0);
+      });
+      return Math.floor(cash * (1 + (window.player.upgrades.cashLevel * 0.25)));
+    }
+    window.calculateTotalEquippedCash = calculateTotalEquippedCash;
+
+    function calculateTotalDPS() {
+      let dps = 0;
+      window.player.equippedAuras.forEach(id => {
+        const a = AURAS_DATABASE.find(item => item.id === id);
+        if (a) dps += (a.dps || 5);
+      });
+      return Math.max(5, dps);
+    }
+
+    setInterval(() => {
+      window.player.timePlayed = (window.player.timePlayed || 0) + 1;
+      const income = calculateTotalEquippedCash();
+      if (income > 0) {
+        window.player.coins += income;
+        updateUI();
+      }
+    }, 1000);
+
+    // SOUMISSION AVEC CODE SECRET POUR vyrox (CODE: 030813)
+    window.submitInitialUsername = async function() {
+      const inputEl = document.getElementById('startUsernameInput');
+      const pinEl = document.getElementById('adminPinInput');
+      const errorEl = document.getElementById('usernameErrorMsg');
+      if(!inputEl) return;
+      const inputVal = inputEl.value.trim();
+
+      if (!inputVal || inputVal.length < 3) {
+        errorEl.innerText = "Entre un pseudo valide (3 caractères min).";
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      if (inputVal.toLowerCase() === "vyrox") {
+        const enteredPin = pinEl ? pinEl.value.trim() : '';
+        if (enteredPin !== "030813") {
+          errorEl.innerText = "Code secret Admin incorrect ! Accès refusé.";
+          errorEl.classList.remove('hidden');
+          return;
+        }
+        window.player.isAdmin = true;
+      } else {
+        window.player.isAdmin = false;
+      }
+
+      if (window.registerOrVerifyUsername) {
+        const res = await window.registerOrVerifyUsername(inputVal);
+        if (!res.success) {
+          errorEl.innerText = res.msg;
+          errorEl.classList.remove('hidden');
+          return;
+        }
+        window.player.username = res.name;
+      } else {
+        window.player.username = inputVal;
+      }
+
+      const modal = document.getElementById('usernameModal');
+      if(modal) modal.classList.add('hidden');
+      checkAdminAccess();
+      updateUI();
+      saveGame();
+
+      if (window.syncOnlineLeaderboardState) window.syncOnlineLeaderboardState(window.player);
+    }
+
+    function checkAdminAccess() {
+      const adminBtn = document.getElementById('adminBtnNav');
+      if(!adminBtn) return;
+      if (window.player.isAdmin && window.player.username.toLowerCase() === "vyrox") {
+        adminBtn.classList.remove('hidden');
+        adminBtn.classList.add('flex');
+      } else {
+        adminBtn.classList.add('hidden');
+        adminBtn.classList.remove('flex');
+      }
+    }
+
+    window.triggerRoll = function() {
+      if (isRolling) return;
+      isRolling = true;
+
+      const rollBtn = document.getElementById('rollButton');
+      if(rollBtn) {
+        rollBtn.disabled = true;
+        rollBtn.classList.add('opacity-50');
+      }
+
+      const iconBox = document.getElementById('mainAuraIcon');
+      const nameBox = document.getElementById('mainAuraName');
+      const rarityBox = document.getElementById('mainAuraRarity');
+
+      let counter = 0;
+      const animInterval = setInterval(() => {
+        const randomAura = AURAS_DATABASE[Math.floor(Math.random() * 20)];
+        if(iconBox) iconBox.innerText = randomAura.icon;
+        if(nameBox) {
+          nameBox.innerText = randomAura.name;
+          nameBox.style.color = randomAura.color;
+        }
+        if(rarityBox) rarityBox.innerText = `Tirage en cours...`;
+        counter++;
+      }, 70);
+
+      setTimeout(() => {
+        clearInterval(animInterval);
+
+        window.player.totalRolls++;
+        const totalLuck = calculateTotalEquippedLuck();
+
+        let selectedAura = AURAS_DATABASE[0];
+        for (let i = AURAS_DATABASE.length - 1; i >= 0; i--) {
+          const aura = AURAS_DATABASE[i];
+          const effChance = Math.max(1, aura.chance / totalLuck);
+          if (Math.random() * effChance <= 1) {
+            selectedAura = aura;
+            break;
+          }
+        }
+
+        window.player.inventory[selectedAura.id] = (window.player.inventory[selectedAura.id] || 0) + 1;
+        window.player.coins += Math.floor(selectedAura.chance / 2) + 10;
+
+        if(iconBox) iconBox.innerText = selectedAura.icon;
+        if(nameBox) {
+          nameBox.innerText = selectedAura.name;
+          nameBox.style.color = selectedAura.color;
+        }
+        if(rarityBox) rarityBox.innerHTML = `Rareté: <span style="color:${selectedAura.color}">1 / ${formatRarity(selectedAura.chance)}</span>`;
+
+        if (selectedAura.chance >= 1000000) {
+          showCutscene(selectedAura);
+        }
+
+        updateUI();
+        saveGame();
+        if (window.syncOnlineLeaderboardState) window.syncOnlineLeaderboardState(window.player);
+
+        isRolling = false;
+        if(rollBtn) {
+          rollBtn.disabled = false;
+          rollBtn.classList.remove('opacity-50');
+        }
+      }, rollSpeedMs);
+    }
+
+    let autoRollInterval = null;
+    window.toggleAutoRoll = function() {
+      const toggleEl = document.getElementById('autoRollToggle');
+      if(!toggleEl) return;
+      const isChecked = toggleEl.checked;
+      if (isChecked) {
+        autoRollInterval = setInterval(() => {
+          if (!isRolling) window.triggerRoll();
+        }, 400);
+      } else {
+        clearInterval(autoRollInterval);
+      }
+    }
+
+    function showCutscene(aura) {
+      const icon = document.getElementById('cutsceneAuraIcon');
+      const name = document.getElementById('cutsceneAuraName');
+      const rarity = document.getElementById('cutsceneRarity');
+      const overlay = document.getElementById('cutsceneOverlay');
+      if(icon) icon.innerText = aura.icon;
+      if(name) name.innerText = aura.name;
+      if(rarity) rarity.innerHTML = `Rareté: <span style="color:${aura.color}">1 / ${formatRarity(aura.chance)}</span>`;
+      if(overlay) {
+        overlay.classList.remove('hidden');
+        overlay.classList.add('flex');
+      }
+    }
+
+    window.closeCutscene = function() {
+      const overlay = document.getElementById('cutsceneOverlay');
+      if(overlay) {
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
+      }
+    }
+
+    window.showGlobalBanner = function(msg) {
+      const banner = document.getElementById('announcementContainer');
+      const text = document.getElementById('announcementMessage');
+      if(text) text.innerText = msg;
+      if(banner) {
+        banner.classList.remove('opacity-0', '-translate-y-8');
+        setTimeout(() => {
+          banner.classList.add('opacity-0', '-translate-y-8');
+        }, 6000);
+      }
+    }
+
+    window.applyAdminEvent = function(evType) {
+      if(evType === 'LUCK_X10') {
+        activeEventMultiplier = 10;
+        window.showGlobalBanner("ÉVÉNEMENT ACTIF : Super Luck x10 par l'Admin !");
+      } else if(evType === 'CASH_X5') {
+        window.player.baseLuckMultiplier = 2;
+        window.showGlobalBanner("ÉVÉNEMENT ACTIF : Boost de Cash x5 !");
+      } else if(evType === 'INSTANT_ROLL') {
+        rollSpeedMs = 100;
+        window.showGlobalBanner("ÉVÉNEMENT ACTIF : Instant Roll (Tirages ultra rapides) !");
+      } else if(evType === 'MEGA_BOSS') {
+        window.showGlobalBanner("ÉVÉNEMENT ACTIF : Mega Boss Cosmique invoqué !");
+      } else if(evType === 'ULTRA_DROP') {
+        activeEventMultiplier = 20;
+        window.showGlobalBanner("ÉVÉNEMENT ACTIF : Ultra Drop (Chance x20) !");
+      }
+    }
+
+    window.updatePollUI = function(poll) {
+      const pollBox = document.getElementById('pollContainer');
+      const qText = document.getElementById('pollQuestionText');
+      const yCount = document.getElementById('pollYesCount');
+      const nCount = document.getElementById('pollNoCount');
+      if (pollBox && qText && poll) {
+        qText.innerText = poll.question;
+        if (yCount) yCount.innerText = poll.yes || 0;
+        if (nCount) nCount.innerText = poll.no || 0;
+        pollBox.classList.remove('hidden');
+      }
+    }
+
+    window.castVote = function(type) {
+      if (window.submitVoteFirebase) window.submitVoteFirebase(type);
+      alert("Votre vote a été comptabilisé !");
+    }
+
+    window.closePollUI = function() {
+      const pollBox = document.getElementById('pollContainer');
+      if(pollBox) pollBox.classList.add('hidden');
+    }
+
+    // FONCTIONS ADMIN OP
+    window.adminSendAnnouncement = function() {
+      const msg = document.getElementById('adminAnnounceMsg').value;
+      if(!msg) return;
+      window.firebaseAdminAction('announcement', msg);
+      window.showGlobalBanner(msg);
+      alert("Annonce envoyée à tous les joueurs !");
+    }
+
+    window.adminTriggerEvent = function(type) {
+      window.firebaseAdminAction('event', type);
+      window.applyAdminEvent(type);
+      alert("Événement mondial activé !");
+    }
+
+    window.adminCreatePoll = function() {
+      const q = document.getElementById('adminPollQuestion').value;
+      if(!q) return;
+      window.firebaseAdminAction('poll', q);
+      alert("Sondage lancé pour tout le monde !");
+    }
+
+    window.adminBanPlayer = function() {
+      const name = document.getElementById('adminBanUsername').value;
+      if(!name) return;
+      window.firebaseAdminAction('ban', name);
+      alert(`Le joueur ${name} a été banni !`);
+    }
+
+    window.adminUnbanPlayer = function() {
+      const name = document.getElementById('adminBanUsername').value;
+      if(!name) return;
+      window.firebaseAdminAction('unban', name);
+      alert(`Le joueur ${name} a été débanni !`);
+    }
+
+    window.buyShopUpgrade = function(type) {
+      const costLuck = Math.floor(100 * Math.pow(1.5, window.player.upgrades.luckLevel));
+      const costCash = Math.floor(250 * Math.pow(1.6, window.player.upgrades.cashLevel));
+
+      if (type === 'luck') {
+        if (window.player.coins >= costLuck) {
+          window.player.coins -= costLuck;
+          window.player.upgrades.luckLevel++;
+        } else {
+          alert("Pas assez de pièces pour améliorer le Luck !");
+          return;
+        }
+      } else if (type === 'cash') {
+        if (window.player.coins >= costCash) {
+          window.player.coins -= costCash;
+          window.player.upgrades.cashLevel++;
+        } else {
+          alert("Pas assez de pièces pour améliorer le Cash !");
+          return;
+        }
+      }
+      updateUI();
+      saveGame();
+    }
+
+    function renderInventory() {
+      const grid = document.getElementById('inventoryGrid');
+      if(!grid) return;
+      grid.innerHTML = '';
+      AURAS_DATABASE.forEach(aura => {
+        const count = window.player.inventory[aura.id] || 0;
+        if (count <= 0) return;
+        const isEquipped = window.player.equippedAuras.includes(aura.id);
+        const card = document.createElement('div');
+        card.className = `bg-cyber-card border ${isEquipped ? 'border-yellow-400' : 'border-cyber-border'} rounded-xl p-3 flex flex-col items-center text-center`;
+        card.innerHTML = `
+          <div class="text-3xl my-1">${aura.icon}</div>
+          <div class="font-bold text-xs truncate w-full" style="color: ${aura.color}">${aura.name}</div>
+          <div class="text-[10px] text-gray-400 mb-2">x${count} (1/${formatRarity(aura.chance)})</div>
+          <button onclick="toggleEquipAura('${aura.id}')" class="w-full py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px] font-bold cursor-pointer">${isEquipped ? 'Équipé' : 'Équiper'}</button>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function renderIndex() {
+      const grid = document.getElementById('indexGrid');
+      if(!grid) return;
+      grid.innerHTML = '';
+
+      let discoveredCount = 0;
+
+      AURAS_DATABASE.forEach(aura => {
+        const isUnlocked = (window.player.inventory[aura.id] || 0) > 0;
+        if (isUnlocked) discoveredCount++;
+
+        const card = document.createElement('div');
+        card.className = `bg-cyber-bg border ${isUnlocked ? 'border-cyan-500/40' : 'border-cyber-border opacity-50'} rounded-xl p-3 flex items-center gap-3`;
+        
+        card.innerHTML = `
+          <div class="text-3xl">${isUnlocked ? aura.icon : '❓'}</div>
+          <div class="flex-1 min-w-0">
+            <div class="font-bold text-xs truncate" style="color: ${isUnlocked ? aura.color : '#9ca3af'}">${isUnlocked ? aura.name : 'Inconnu'}</div>
+            <div class="text-[10px] text-gray-400">1 / ${formatRarity(aura.chance)}</div>
+            <div class="text-[9px] text-green-400">+${aura.luckBonus}% Luck | +${aura.cashPerSec}/s</div>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+
+      const counterEl = document.getElementById('indexCounter');
+      if(counterEl) counterEl.innerText = `Découvertes : ${discoveredCount} / 50`;
+    }
+
+    function renderEquippedSlots() {
+      const grid = document.getElementById('equippedSlotsGrid');
+      if(!grid) return;
+      grid.innerHTML = '';
+      for (let i = 0; i < window.player.maxEquipSlots; i++) {
+        const id = window.player.equippedAuras[i];
+        const aura = AURAS_DATABASE.find(a => a.id === id);
+        const card = document.createElement('div');
+        card.className = 'bg-cyber-bg border border-indigo-500/50 rounded-xl p-4 text-center';
+        if (aura) {
+          card.innerHTML = `<div class="text-4xl">${aura.icon}</div><div class="font-bold text-sm" style="color:${aura.color}">${aura.name}</div><div class="text-[10px] text-gray-400">1 / ${formatRarity(aura.chance)}</div><div class="text-[10px] text-green-400 mt-1">+${aura.luckBonus}% Luck • +${aura.cashPerSec}/s</div>`;
+        } else {
+          card.innerHTML = `<div class="text-gray-500 text-xs py-6">Slot ${i+1} Vide</div>`;
+        }
+        grid.appendChild(card);
+      }
+    }
+
+    window.toggleEquipAura = function(id) {
+      const idx = window.player.equippedAuras.indexOf(id);
+      if (idx !== -1) {
+        if (window.player.equippedAuras.length > 1) window.player.equippedAuras.splice(idx, 1);
+      } else {
+        if (window.player.equippedAuras.length < window.player.maxEquipSlots) window.player.equippedAuras.push(id);
+      }
+      updateUI();
+      renderInventory();
+      renderEquippedSlots();
+      saveGame();
+      if (window.syncOnlineLeaderboardState) window.syncOnlineLeaderboardState(window.player);
+    }
+
+    window.equipBestAuras = function() {
+      const owned = AURAS_DATABASE.filter(a => (window.player.inventory[a.id] || 0) > 0);
+      owned.sort((a,b) => b.chance - a.chance);
+      window.player.equippedAuras = owned.slice(0, window.player.maxEquipSlots).map(a => a.id);
+      updateUI();
+      renderInventory();
+      renderEquippedSlots();
+      saveGame();
+      if (window.syncOnlineLeaderboardState) window.syncOnlineLeaderboardState(window.player);
+      alert("Meilleures auras équipées avec succès !");
+    }
+
+    window.autoSellDuplicates = function() {
+      AURAS_DATABASE.forEach(aura => {
+        if (aura.chance <= 20 && (window.player.inventory[aura.id] || 0) > 1) {
+          const count = window.player.inventory[aura.id] - 1;
+          window.player.inventory[aura.id] = 1;
+          window.player.coins += count * aura.chance;
+        }
+      });
+      updateUI();
+      renderInventory();
+      saveGame();
+      alert("Doublons communs vendus !");
+    }
+
+    let bossHp = 1000;
+    window.attackBoss = function() {
+      bossHp -= calculateTotalDPS();
+      if (bossHp <= 0) {
+        window.player.coins += 10000;
+        window.player.gems += 100;
+        bossHp = 2000;
+        alert("Boss vaincu ! +10,000 Pièces & +100 Gemmes");
+      }
+      const bossText = document.getElementById('bossHealthText');
+      if(bossText) bossText.innerText = `${Math.max(0, bossHp)} / 2000 PV`;
+    }
+
+    window.switchLeaderboardCategory = function(cat) {
+      currentLbCategory = cat;
+      const btnRarity = document.getElementById('lbBtn-rarity');
+      const btnCash = document.getElementById('lbBtn-cash');
+      const btnTime = document.getElementById('lbBtn-time');
+
+      if(btnRarity) btnRarity.className = 'px-3 py-1.5 ' + (cat === 'rarity' ? 'bg-indigo-600 text-white' : 'bg-cyber-bg border border-cyber-border text-gray-400') + ' rounded-lg text-xs font-bold transition cursor-pointer';
+      if(btnCash) btnCash.className = 'px-3 py-1.5 ' + (cat === 'cash' ? 'bg-indigo-600 text-white' : 'bg-cyber-bg border border-cyber-border text-gray-400') + ' rounded-lg text-xs font-bold transition cursor-pointer';
+      if(btnTime) btnTime.className = 'px-3 py-1.5 ' + (cat === 'time' ? 'bg-indigo-600 text-white' : 'bg-cyber-bg border border-cyber-border text-gray-400') + ' rounded-lg text-xs font-bold transition cursor-pointer';
+      
+      const header = document.getElementById('lbValueHeader');
+      if(header) {
+        if (cat === 'rarity') header.innerText = "Meilleure Aura";
+        if (cat === 'cash') header.innerText = "Argent / sec";
+        if (cat === 'time') header.innerText = "Temps joué";
+      }
+
+      window.renderLeaderboard();
+    }
+
+    window.renderLeaderboard = function() {
+      const tbody = document.getElementById('leaderboardRows');
+      if(!tbody) return;
+      tbody.innerHTML = '';
+
+      let data = [...window.ONLINE_LEADERBOARD_DATA];
+
+      const selfId = window.ONLINE_USER_ID || 'local';
+      if (!data.some(p => p.id === selfId)) {
+        let bestRarity = 2, bestName = "Commun", bestIcon = "⚪";
+        AURAS_DATABASE.forEach(a => {
+          if ((window.player.inventory[a.id] || 0) > 0 && a.chance >= bestRarity) {
+            bestRarity = a.chance; bestName = a.name; bestIcon = a.icon;
+          }
+        });
+        data.push({
+          id: selfId,
+          username: window.player.username + ' (Vous)',
+          bestRarity: bestRarity,
+          bestAuraName: bestName,
+          bestAuraIcon: bestIcon,
+          cashPerSec: calculateTotalEquippedCash(),
+          timePlayed: window.player.timePlayed || 0
+        });
+      }
+
+      if (currentLbCategory === 'rarity') {
+        data.sort((a, b) => (b.bestRarity || 2) - (a.bestRarity || 2));
+      } else if (currentLbCategory === 'cash') {
+        data.sort((a, b) => (b.cashPerSec || 0) - (a.cashPerSec || 0));
+      } else if (currentLbCategory === 'time') {
+        data.sort((a, b) => (b.timePlayed || 0) - (a.timePlayed || 0));
+      }
+
+      data.forEach((p, index) => {
+        const tr = document.createElement('tr');
+        const isSelf = p.id === selfId;
+        const isAdmin = (p.username || '').toLowerCase() === 'vyrox';
+        tr.className = isSelf ? 'bg-indigo-950/40 border-l-4 border-indigo-500 font-bold' : '';
+
+        let valDisplay = '';
+        if (currentLbCategory === 'rarity') {
+          valDisplay = `${p.bestAuraIcon || '⚪'} ${p.bestAuraName || 'Commun'} (1/${formatRarity(p.bestRarity || 2)})`;
+        } else if (currentLbCategory === 'cash') {
+          valDisplay = `+${formatRarity(p.cashPerSec || 0)} /s`;
+        } else if (currentLbCategory === 'time') {
+          const mins = Math.floor((p.timePlayed || 0) / 60);
+          const secs = (p.timePlayed || 0) % 60;
+          valDisplay = `${mins}m ${secs}s`;
+        }
+
+        tr.innerHTML = `
+          <td class="py-3 px-4">#${index + 1}</td>
+          <td class="py-3 px-4 ${isAdmin ? 'text-red-400 font-black' : ''}">${p.username || 'Joueur'} ${isAdmin ? '👑 [ADMIN]' : ''}</td>
+          <td class="py-3 px-4">${valDisplay}</td>
+          <td class="py-3 px-4 text-right"><span class="text-green-400 text-xs">● En ligne</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    };
+
+    window.openAdminModal = function() {
+      if (!window.player.isAdmin || window.player.username.toLowerCase() !== "vyrox") {
+        alert("Accès refusé ! Réservé exclusivement à vyrox avec le code secret.");
+        return;
+      }
+      const select = document.getElementById('adminAuraSelect');
+      if(select) {
+        select.innerHTML = '';
+        AURAS_DATABASE.forEach(aura => {
+          const opt = document.createElement('option');
+          opt.value = aura.id;
+          opt.textContent = `${aura.icon} ${aura.name} (1/${formatRarity(aura.chance)})`;
+          select.appendChild(opt);
+        });
+      }
+      const modal = document.getElementById('adminModal');
+      if(modal) modal.classList.remove('hidden');
+    }
+
+    window.closeAdminModal = function() {
+      const modal = document.getElementById('adminModal');
+      if(modal) modal.classList.add('hidden');
+    }
+
+    window.adminGiveCoins = function() { window.player.coins += 100000000; updateUI(); saveGame(); alert("+100M Pièces injectées !"); }
+    window.adminGiveGems = function() { window.player.gems += 100000; updateUI(); saveGame(); alert("+100k Gemmes injectées !"); }
+    window.adminMaxUpgrades = function() { window.player.upgrades.luckLevel = 50; window.player.upgrades.cashLevel = 50; updateUI(); saveGame(); alert("Boutiques maxées au niveau 50 !"); }
+    window.adminUnlockAllAuras = function() { AURAS_DATABASE.forEach(a => window.player.inventory[a.id] = 1); updateUI(); saveGame(); alert("Index complet débloqué !"); }
+    
+    window.resetGameData = function() {
+      if(confirm("Veux-tu vraiment réinitialiser ta sauvegarde ?")) {
+        localStorage.removeItem('ROLL_A_AURA_SAVE_v70');
+        location.reload();
+      }
+    }
+
+    window.adminInjectAura = function() {
+      const select = document.getElementById('adminAuraSelect');
+      if(!select) return;
+      const id = select.value;
+      window.player.inventory[id] = (window.player.inventory[id] || 0) + 1;
+      updateUI();
+      saveGame();
+      alert("Aura injectée avec succès !");
+    }
+
+    function updateUI() {
+      const coinsEl = document.getElementById('headerCoins');
+      const gemsEl = document.getElementById('headerGems');
+      const rollsEl = document.getElementById('headerRolls');
+      const userDisplay = document.getElementById('playerUsernameDisplay');
+
+      if(coinsEl) coinsEl.innerText = formatRarity(window.player.coins);
+      if(gemsEl) gemsEl.innerText = formatRarity(window.player.gems);
+      if(rollsEl) rollsEl.innerText = formatRarity(window.player.totalRolls);
+      if(userDisplay) userDisplay.innerHTML = `<i class="fa-solid fa-user"></i> ${window.player.username}`;
+
+      const luckLvl = document.getElementById('shopLuckLevel');
+      const cashLvl = document.getElementById('shopCashLevel');
+      const costLuck = document.getElementById('costShopLuck');
+      const costCash = document.getElementById('costShopCash');
+
+      if(luckLvl) luckLvl.innerText = window.player.upgrades.luckLevel;
+      if(cashLvl) cashLvl.innerText = window.player.upgrades.cashLevel;
+      if(costLuck) costLuck.innerText = formatRarity(Math.floor(100 * Math.pow(1.5, window.player.upgrades.luckLevel)));
+      if(costCash) costCash.innerText = formatRarity(Math.floor(250 * Math.pow(1.6, window.player.upgrades.cashLevel)));
+
+      checkAdminAccess();
+    }
+
+    window.switchTab = function(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      const targetTab = document.getElementById(`tab-${tabId}`);
+      if(targetTab) targetTab.classList.remove('hidden');
+
+      const tabNames = ['roll', 'shop', 'equipped', 'inventory', 'index', 'leaderboard', 'arena'];
+      tabNames.forEach(name => {
+        const btn = document.getElementById(`tabBtn-${name}`);
+        if(btn) {
+          if (name === tabId) {
+            btn.className = "tab-btn px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition bg-indigo-600 text-white shadow-lg whitespace-nowrap cursor-pointer";
+          } else {
+            btn.className = "tab-btn px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition bg-cyber-card text-gray-400 hover:text-white whitespace-nowrap cursor-pointer";
+          }
+        }
+      });
+
+      if (tabId === 'inventory') renderInventory();
+      if (tabId === 'equipped') renderEquippedSlots();
+      if (tabId === 'index') renderIndex();
+      if (tabId === 'leaderboard' && window.renderLeaderboard) window.renderLeaderboard();
+    }
+
+    function saveGame() { 
+      try {
+        localStorage.setItem('ROLL_A_AURA_SAVE_v70', JSON.stringify(window.player)); 
+      } catch(e) {}
+    }
+
+    function loadGame() {
+      try {
+        const saved = localStorage.getItem('ROLL_A_AURA_SAVE_v70');
+        if (saved) {
+          window.player = { ...window.player, ...JSON.parse(saved) };
+          if (window.player.username) {
+            const modal = document.getElementById('usernameModal');
+            if(modal) modal.classList.add('hidden');
+            checkAdminAccess();
+            updateUI();
+          }
+        }
+      } catch(e) {
+        localStorage.removeItem('ROLL_A_AURA_SAVE_v70');
+      }
+    }
+
+    window.onload = function() { 
+      loadGame(); 
+    };
+  </script>
+</body>
+</html>
